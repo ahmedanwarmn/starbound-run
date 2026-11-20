@@ -11,7 +11,7 @@ const ui = {
 };
 let state="menu", last=0, camera=0, score=0, coins=0, lives=3, levelIndex=0, soundOn=true, audioCtx=null;
 const keys={left:false,right:false,jump:false};
-let jumpQueued=false, player, platforms=[], coinItems=[], enemies=[], particles=[], goal, levelWidth=0, clouds=[];
+let jumpQueued=false, jumpBuffer=0, coyoteTime=0, player, platforms=[], coinItems=[], enemies=[], particles=[], goal, levelWidth=0, clouds=[];
 const levels=[
  {name:"1-1",width:3300,ground:432, platforms:[[360,340,150],[650,285,145],[940,355,145],[1250,300,145],[1570,345,145],[1900,275,155],[2250,340,150],[2570,285,155],[2860,350,145]], pits:[[780,140],[1740,130],[2400,120]], coins:[[390,300],[438,300],[690,245],[738,245],[980,315],[1028,315],[1290,260],[1338,260],[1610,305],[1658,305],[1940,235],[1988,235],[2290,300],[2338,300],[2610,245],[2658,245],[2900,310]], enemies:[[560,384],[1090,384],[1460,384],[2040,384],[2760,384]]},
  {name:"1-2",width:3900,ground:432, platforms:[[300,340,150],[580,285,150],[900,330,150],[1200,260,150],[1510,320,150],[1810,260,160],[2140,335,150],[2450,280,150],[2760,330,150],[3090,250,160],[3420,320,150]], pits:[[700,120],[1350,130],[1990,120],[2630,120],[3270,120]], coins:[[330,300],[380,300],[620,245],[670,245],[940,290],[990,290],[1240,215],[1290,215],[1550,275],[1600,275],[1850,215],[1900,215],[2180,290],[2230,290],[2490,235],[2540,235],[2800,285],[2850,285],[3130,205],[3180,205],[3460,275]], enemies:[[500,384],[1050,384],[1690,384],[2320,384],[2950,384],[3600,384]]}
@@ -53,8 +53,14 @@ function update(dt){
  if(keys.left){player.vx-=1450*dt;player.face=-1;} if(keys.right){player.vx+=1450*dt;player.face=1;}
  if(!keys.left&&!keys.right)player.vx*=Math.pow(.0008,dt);
  player.vx=Math.max(-310,Math.min(310,player.vx));
- if(jumpQueued&&player.onGround){player.vy=-690;player.onGround=false;sound(440,.1);}
+ // Buffer a touch jump briefly so a tap just before landing is not lost.
+ if(jumpQueued) jumpBuffer=0.18;
  jumpQueued=false;
+ if(player.onGround) coyoteTime=0.12; else coyoteTime=Math.max(0,coyoteTime-dt);
+ jumpBuffer=Math.max(0,jumpBuffer-dt);
+ if(jumpBuffer>0 && (player.onGround || coyoteTime>0)){
+  player.vy=-690;player.onGround=false;coyoteTime=0;jumpBuffer=0;sound(440,.1);
+ }
  player.vy=Math.min(1050,player.vy+GRAVITY*dt);
  let nx=player.x+player.vx*dt;
  if(!solidAt(nx,player.y,player.w,player.h))player.x=nx;else player.vx=0;
@@ -118,12 +124,24 @@ function draw(){
  ctx.restore();
 }
 function loop(t){let dt=Math.min(.033,(t-last)/1000||0);last=t;update(dt);draw();requestAnimationFrame(loop);}
-function start(){if(state==="playing")return;score=0;coins=0;lives=3;levelIndex=0;ui.score.textContent=score;ui.coins.textContent=coins;ui.lives.textContent=lives;resetLevel();state="playing";ui.overlay.style.display="none";sound(600,.12);}
+function start(){if(state==="playing")return;jumpBuffer=0;coyoteTime=0;jumpQueued=false;score=0;coins=0;lives=3;levelIndex=0;ui.score.textContent=score;ui.coins.textContent=coins;ui.lives.textContent=lives;resetLevel();state="playing";ui.overlay.style.display="none";sound(600,.12);}
 function endGame(won){state="ended";ui.overlay.style.display="grid";ui.panel.innerHTML=`<h1>${won?"YOU DID IT!":"GAME OVER"}</h1><p>${won?"You cleared every world and reached the star flag!":"Every great adventurer gets another try."}<br><b>Score: ${score}</b><br>Coins collected: ${coins}</p><button class="mainbtn" id="againBtn">PLAY AGAIN</button><p style="font-size:12px;margin-bottom:0">Your best score: ${Math.max(score,Number(localStorage.getItem("starboundBest")||0))}</p>`;let best=Math.max(score,Number(localStorage.getItem("starboundBest")||0));localStorage.setItem("starboundBest",best);document.getElementById("againBtn").onclick=start;}
 ui.start.onclick=start;
 ui.sound.onclick=()=>{soundOn=!soundOn;ui.sound.textContent=soundOn?"🔊":"🔇";if(soundOn)sound(550,.07);};
 function press(k,on){if(k==="jump"&&on)jumpQueued=true;keys[k]=on;document.querySelectorAll(`[data-key="${k}"]`).forEach(b=>b.classList.toggle("down",on));}
-document.querySelectorAll("[data-key]").forEach(b=>{const k=b.dataset.key;b.addEventListener("pointerdown",e=>{e.preventDefault();b.setPointerCapture?.(e.pointerId);press(k,true);});for(const ev of ["pointerup","pointercancel","lostpointercapture"])b.addEventListener(ev,e=>{e.preventDefault();press(k,false);});});
+document.querySelectorAll("[data-key]").forEach(b=>{
+ const k=b.dataset.key;
+ const down=e=>{e.preventDefault();if(k==="jump")jumpQueued=true;press(k,true);};
+ const up=e=>{if(e)e.preventDefault();press(k,false);};
+ b.addEventListener("pointerdown",down,{passive:false});
+ b.addEventListener("pointerup",up,{passive:false});
+ b.addEventListener("pointercancel",up,{passive:false});
+ b.addEventListener("lostpointercapture",up,{passive:false});
+ // Touch fallback for mobile Safari.
+ b.addEventListener("touchstart",down,{passive:false});
+ b.addEventListener("touchend",up,{passive:false});
+ b.addEventListener("touchcancel",up,{passive:false});
+});
 window.addEventListener("keydown",e=>{if(["ArrowLeft","ArrowRight"," ","ArrowUp","w","a","d"].includes(e.key))e.preventDefault();if(e.key==="ArrowLeft"||e.key==="a")press("left",true);if(e.key==="ArrowRight"||e.key==="d")press("right",true);if(e.key===" "||e.key==="ArrowUp"||e.key==="w")press("jump",true);});
 window.addEventListener("keyup",e=>{if(e.key==="ArrowLeft"||e.key==="a")press("left",false);if(e.key==="ArrowRight"||e.key==="d")press("right",false);if(e.key===" "||e.key==="ArrowUp"||e.key==="w")press("jump",false);});
 document.addEventListener("contextmenu",e=>e.preventDefault());
