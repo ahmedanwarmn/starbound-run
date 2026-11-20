@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#68c9f2">
+  <meta name="description" content="Starbound Run — a colorful original retro platform adventure.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <title>Starbound Run</title>
+  <style>
+    :root { color-scheme: dark; --ui:#13233d; --gold:#ffd447; }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html,body { margin:0; width:100%; height:100%; overflow:hidden; background:#13233d; font-family:system-ui,-apple-system,Segoe UI,sans-serif; touch-action:none; }
+    #game-wrap { position:relative; width:100%; height:100%; display:grid; place-items:center; overflow:hidden; background:linear-gradient(#75d4f5,#d5f5ff); }
+    canvas { display:block; width:100%; height:100%; object-fit:contain; image-rendering:pixelated; touch-action:none; }
+    #hud { position:absolute; inset: max(10px,env(safe-area-inset-top)) 12px auto; display:flex; justify-content:space-between; align-items:flex-start; gap:8px; pointer-events:none; color:white; text-shadow:2px 2px 0 #173052,-1px -1px 0 #173052; font-weight:900; font-size:clamp(13px,2.5vw,20px); }
+    .hudbox { background:#102849b8; border:2px solid #ffffff80; border-radius:12px; padding:6px 10px; }
+    #soundBtn { pointer-events:auto; border:0; color:white; background:#102849d9; border:2px solid #ffffff80; border-radius:12px; padding:6px 10px; font-size:18px; }
+    #overlay { position:absolute; inset:0; display:grid; place-items:center; padding:22px; background:#10284970; }
+    #panel { width:min(440px,94vw); color:#18304e; background:#fff8df; border:5px solid #8a552d; border-radius:20px; padding:22px; text-align:center; box-shadow:0 8px 0 #58351f,0 18px 45px #10284966; }
+    #panel h1 { margin:0 0 6px; font-size:clamp(28px,7vw,44px); line-height:1; color:#e34b36; text-shadow:2px 3px 0 #ffd447; }
+    #panel p { margin:10px 0 16px; line-height:1.45; }
+    .mainbtn { border:0; border-radius:14px; padding:13px 25px; font-weight:900; font-size:18px; color:#173052; background:#ffd447; box-shadow:0 5px 0 #c28b16; }
+    .mainbtn:active { transform:translateY(3px); box-shadow:0 2px 0 #c28b16; }
+    #controls { position:absolute; left:0; right:0; bottom:max(16px,env(safe-area-inset-bottom)); display:flex; justify-content:space-between; align-items:end; padding:0 18px; pointer-events:none; }
+    .cluster { display:flex; gap:12px; pointer-events:auto; }
+    .ctrl { width:clamp(58px,13vw,78px); height:clamp(58px,13vw,78px); border-radius:22px; border:3px solid #ffffffa8; background:#15375dc9; color:white; font-size:clamp(25px,6vw,36px); font-weight:900; box-shadow:0 5px 0 #0b2038; user-select:none; touch-action:none; }
+    .ctrl:active,.ctrl.down { background:#e65a40; transform:translateY(3px); box-shadow:0 2px 0 #0b2038; }
+    #jump { width:clamp(72px,16vw,94px); height:clamp(72px,16vw,94px); border-radius:50%; background:#e65a40; }
+    #hint { position:absolute; bottom:calc(max(16px,env(safe-area-inset-bottom)) + 96px); left:50%; transform:translateX(-50%); color:white; font-weight:800; text-shadow:1px 2px #173052; white-space:nowrap; font-size:12px; opacity:.9; pointer-events:none; }
+    @media (min-width:850px) { #controls { max-width:900px; left:50%; transform:translateX(-50%); width:100%; } }
+  </style>
+</head>
+<body>
+<div id="game-wrap">
+  <canvas id="game" width="960" height="540" aria-label="Starbound Run platform game"></canvas>
+  <div id="hud">
+    <div class="hudbox">⭐ <span id="score">0</span></div>
+    <div class="hudbox">🪙 <span id="coins">0</span> &nbsp; ❤️ <span id="lives">3</span></div>
+    <div class="hudbox">WORLD <span id="world">1-1</span></div>
+    <button id="soundBtn" aria-label="Toggle sound">🔊</button>
+  </div>
+  <div id="hint">◀ ▶ MOVE &nbsp; • &nbsp; JUMP TO STOMP ENEMIES</div>
+  <div id="controls">
+    <div class="cluster">
+      <button class="ctrl" data-key="left" aria-label="Move left">◀</button>
+      <button class="ctrl" data-key="right" aria-label="Move right">▶</button>
+    </div>
+    <button class="ctrl" id="jump" data-key="jump" aria-label="Jump">⬆</button>
+  </div>
+  <div id="overlay">
+    <div id="panel">
+      <h1>STARBOUND RUN</h1>
+      <p><b>A tiny hero. A big adventure.</b><br>Run, jump, collect stars and reach the flag!<br><small>Touch controls are ready. Keyboard: ← → and Space.</small></p>
+      <button class="mainbtn" id="startBtn">PLAY NOW</button>
+      <p style="font-size:12px;margin-bottom:0">Original retro platform adventure</p>
+    </div>
+  </div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
