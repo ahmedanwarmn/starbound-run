@@ -30,7 +30,7 @@ function resetLevel(){
  coinItems=L.coins.map(([x,y])=>({x,y,r:12,taken:false,phase:Math.random()*6}));
  enemies=L.enemies.map(([x,y])=>({x,y,w:34,h:38,vx:-65,alive:true,dir:-1}));
  particles=[]; clouds=Array.from({length:18},(_,i)=>({x:i*240+Math.random()*100,y:45+Math.random()*150,s:.6+Math.random()*.8}));
- player={x:70,y:300,w:34,h:44,vx:0,vy:0,onGround:false,invuln:0,face:1,anim:0};
+ player={x:70,y:300,w:34,h:44,vx:0,vy:0,onGround:false,jumpsRemaining:1,invuln:0,face:1,anim:0};
  goal={x:levelWidth-170,y:L.ground-150};
  ui.world.textContent=L.name;
 }
@@ -53,21 +53,14 @@ function update(dt){
  if(keys.left){player.vx-=1450*dt;player.face=-1;} if(keys.right){player.vx+=1450*dt;player.face=1;}
  if(!keys.left&&!keys.right)player.vx*=Math.pow(.0008,dt);
  player.vx=Math.max(-310,Math.min(310,player.vx));
- // Buffer a touch jump briefly so a tap just before landing is not lost.
- if(jumpQueued) jumpBuffer=0.18;
- jumpQueued=false;
- if(player.onGround) coyoteTime=0.12; else coyoteTime=Math.max(0,coyoteTime-dt);
- jumpBuffer=Math.max(0,jumpBuffer-dt);
- if(jumpBuffer>0 && (player.onGround || coyoteTime>0)){
-  player.vy=-690;player.onGround=false;coyoteTime=0;jumpBuffer=0;sound(440,.1);
- }
+ // Jump is triggered directly by the input handler; landing restores one jump.
  player.vy=Math.min(1050,player.vy+GRAVITY*dt);
  let nx=player.x+player.vx*dt;
  if(!solidAt(nx,player.y,player.w,player.h))player.x=nx;else player.vx=0;
  let ny=player.y+player.vy*dt;player.onGround=false;
  if(player.vy>=0){
   const oldBottom=player.y+player.h;
-  for(const p of platforms){if(p.pit)continue;if(player.x+player.w>p.x&&player.x<p.x+p.w&&oldBottom<=p.y+8&&ny+player.h>=p.y){ny=p.y-player.h;player.vy=0;player.onGround=true;}}
+  for(const p of platforms){if(p.pit)continue;if(player.x+player.w>p.x&&player.x<p.x+p.w&&oldBottom<=p.y+8&&ny+player.h>=p.y){ny=p.y-player.h;player.vy=0;player.onGround=true;player.jumpsRemaining=1;}}
  } else {
   for(const p of platforms){if(p.pit)continue;if(player.x+player.w>p.x&&player.x<p.x+p.w&&player.y>=p.y+p.h-4&&ny<=p.y+p.h){ny=p.y+p.h;player.vy=80;}}
  }
@@ -128,22 +121,31 @@ function start(){if(state==="playing")return;jumpBuffer=0;coyoteTime=0;jumpQueue
 function endGame(won){state="ended";ui.overlay.style.display="grid";ui.panel.innerHTML=`<h1>${won?"YOU DID IT!":"GAME OVER"}</h1><p>${won?"You cleared every world and reached the star flag!":"Every great adventurer gets another try."}<br><b>Score: ${score}</b><br>Coins collected: ${coins}</p><button class="mainbtn" id="againBtn">PLAY AGAIN</button><p style="font-size:12px;margin-bottom:0">Your best score: ${Math.max(score,Number(localStorage.getItem("starboundBest")||0))}</p>`;let best=Math.max(score,Number(localStorage.getItem("starboundBest")||0));localStorage.setItem("starboundBest",best);document.getElementById("againBtn").onclick=start;}
 ui.start.onclick=start;
 ui.sound.onclick=()=>{soundOn=!soundOn;ui.sound.textContent=soundOn?"🔊":"🔇";if(soundOn)sound(550,.07);};
-function press(k,on){if(k==="jump"&&on)jumpQueued=true;keys[k]=on;document.querySelectorAll(`[data-key="${k}"]`).forEach(b=>b.classList.toggle("down",on));}
+function performJump(){
+ if(state!=="playing" || !player || player.jumpsRemaining<=0)return;
+ player.vy=-690;
+ player.onGround=false;
+ player.jumpsRemaining--;
+ sound(440,.1);
+}
+function press(k,on){
+ if(k==="jump"&&on)performJump();
+ keys[k]=on;
+ document.querySelectorAll(`[data-key="${k}"]`).forEach(b=>b.classList.toggle("down",on));
+}
 document.querySelectorAll("[data-key]").forEach(b=>{
  const k=b.dataset.key;
- const down=e=>{e.preventDefault();if(k==="jump")jumpQueued=true;press(k,true);};
- const up=e=>{if(e)e.preventDefault();press(k,false);};
+ const down=e=>{e.preventDefault();if(k==="jump")performJump();else press(k,true);};
+ const up=e=>{if(e)e.preventDefault();if(k!=="jump")press(k,false);else b.classList.remove("down");};
  b.addEventListener("pointerdown",down,{passive:false});
  b.addEventListener("pointerup",up,{passive:false});
  b.addEventListener("pointercancel",up,{passive:false});
- b.addEventListener("lostpointercapture",up,{passive:false});
- // Touch fallback for mobile Safari.
  b.addEventListener("touchstart",down,{passive:false});
  b.addEventListener("touchend",up,{passive:false});
  b.addEventListener("touchcancel",up,{passive:false});
 });
-window.addEventListener("keydown",e=>{if(["ArrowLeft","ArrowRight"," ","ArrowUp","w","a","d"].includes(e.key))e.preventDefault();if(e.key==="ArrowLeft"||e.key==="a")press("left",true);if(e.key==="ArrowRight"||e.key==="d")press("right",true);if(e.key===" "||e.key==="ArrowUp"||e.key==="w")press("jump",true);});
-window.addEventListener("keyup",e=>{if(e.key==="ArrowLeft"||e.key==="a")press("left",false);if(e.key==="ArrowRight"||e.key==="d")press("right",false);if(e.key===" "||e.key==="ArrowUp"||e.key==="w")press("jump",false);});
+window.addEventListener("keydown",e=>{if(["ArrowLeft","ArrowRight"," ","ArrowUp","w","a","d"].includes(e.key))e.preventDefault();if(e.key==="ArrowLeft"||e.key==="a")press("left",true);if(e.key==="ArrowRight"||e.key==="d")press("right",true);if((e.key===" "||e.key==="ArrowUp"||e.key==="w")&&!e.repeat)performJump();});
+window.addEventListener("keyup",e=>{if(e.key==="ArrowLeft"||e.key==="a")press("left",false);if(e.key==="ArrowRight"||e.key==="d")press("right",false);if(e.key===" "||e.key==="ArrowUp"||e.key==="w")keys.jump=false;});
 document.addEventListener("contextmenu",e=>e.preventDefault());
 if("serviceWorker" in navigator && location.protocol.startsWith("http"))window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
 resetLevel();requestAnimationFrame(loop);
